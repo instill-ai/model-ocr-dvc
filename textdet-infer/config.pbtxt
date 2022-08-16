@@ -1,0 +1,11 @@
+name: "textdet-infer"
+platform: "onnxruntime_onnx"
+max_batch_size: 10
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+dynamic_batching { }
+version_policy: { all { }}

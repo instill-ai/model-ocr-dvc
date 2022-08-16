@@ -1,0 +1,123 @@
+name: "ocr"
+platform: "ensemble"
+max_batch_size: 10
+input [
+  {
+    name: "input"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "box"
+    data_type: TYPE_FP32
+    dims: [ 4 ]
+  },
+  {
+    name: "text"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }  
+]
+ensemble_scheduling {
+  step [
+    {
+      model_name: "pre"
+      model_version: -1
+      input_map {
+        key: "input"
+        value: "input"
+      }
+      output_map {
+        key: "output"
+        value: "preprocessed_image"
+      }
+      output_map {
+        key: "scale"
+        value: "scale"
+      }      
+      output_map {
+        key: "image"
+        value: "image"
+      }            
+    },
+    {
+      model_name: "textdet-infer"
+      model_version: -1
+      input_map {
+        key: "input"
+        value: "preprocessed_image"
+      }
+      output_map {
+        key: "output"
+        value: "mask"
+      }
+    },
+    {
+      model_name: "mid"
+      model_version: -1
+      input_map {
+        key: "mask"
+        value: "mask"
+      }   
+      input_map {
+        key: "scale"
+        value: "scale"
+      }       
+      input_map {
+        key: "image"
+        value: "image"
+      }       
+      output_map {
+        key: "bbox"
+        value: "bbox"
+      }
+      output_map {
+        key: "mbbox"
+        value: "mbbox"
+      }      
+      output_map {
+        key: "textline"
+        value: "textline"
+      }      
+    },
+    {
+      model_name: "textrecog-infer"
+      model_version: -1
+      input_map {
+        key: "input1"
+        value: "textline"
+      }
+      output_map {
+        key: "output"
+        value: "ocr"
+      }
+    },    
+    {  
+      model_name: "post"
+      model_version: -1
+      input_map {
+        key: "box"
+        value: "bbox"
+      }  
+      input_map {
+        key: "mbox"
+        value: "mbbox"
+      }             
+      input_map {
+        key: "ocr"
+        value: "ocr"
+      }       
+      output_map {
+        key: "box"
+        value: "box"
+      }
+      output_map {
+        key: "text"
+        value: "text"
+      }      
+    }      
+  ]
+}
+version_policy: { all { }}
