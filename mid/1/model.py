@@ -13,6 +13,9 @@ from triton_python_backend_utils import Tensor, InferenceResponse, \
     get_input_tensor_by_name, InferenceRequest, get_input_config_by_name, \
     get_output_config_by_name, triton_string_to_numpy
 
+import triton_python_backend_utils as pb_utils
+
+
 class NormalizePAD(object):
     def __init__(self, max_size, PAD_type='right'):
         self.toTensor = transforms.ToTensor()
@@ -99,8 +102,8 @@ class TritonPythonModel(object):
             batch_out = {k: [] for k, name in self.output_names.items(
             ) if name in request.requested_output_names()}
 
-            # model only process single image
             img_idx = 0
+            map_image_boxes = {}
             for image, mask, scale_img in zip(batch_in['image'], batch_in['mask'], batch_in['scale']):  # img is shape (1,)
                 img_idx += 1
                 image_h, image_w = image.shape[:2]
@@ -112,6 +115,7 @@ class TritonPythonModel(object):
                 kernel = np.ones((5, 5), np.uint8)
                 img = cv2.dilate(np.array(img).astype("uint8"), kernel, iterations=1)
                 contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                map_image_boxes[img_idx] = {"image": org_img, "bbox": []}
                 for contour in contours:
                     x,y,w,h = cv2.boundingRect(contour)
                     x = int(x*scale_net[0]*scale_img[0])
@@ -125,23 +129,26 @@ class TritonPythonModel(object):
                     y2 = y + h
                     if x2 > image_w: x2 = image_w
                     if y2 > image_h: y2 = image_h
-                    batch_out['bbox'].append([x, y, x2-x, y2-y])         
-                    batch_out['mbbox'].append(img_idx)         
-            max_w = max([math.ceil(bb[2]/bb[3])*64 for bb in batch_out['bbox']])   
-            for bb in batch_out['bbox']:  # img is shape (1,)
-                normalizePAD = NormalizePAD((1, 64, max_w))    
-                x, y, w, h = bb
-                roi = org_img[y:y+h, x:x+w]
-                roi = cv2.resize(np.array(roi), (int(w*64/h) ,64), interpolation = cv2.INTER_AREA)
-                roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) / 255.0
-                roi = normalizePAD.normalize(roi)
-                roi = np.array(roi).astype("float32")
-                batch_out['textline'].append(roi)
+                    map_image_boxes[img_idx]["bbox"].append([x, y, x2-x, y2-y])
+                    batch_out['bbox'].append([x, y, x2 - x, y2 - y])
+                    batch_out['mbbox'].append(img_idx)
+            if len(batch_out['bbox']) > 0:
+                max_w = max([math.ceil(bb[2]/bb[3])*64 for bb in batch_out['bbox']])
+                normalizePAD = NormalizePAD((1, 64, max_w))
+                for image_idx, image_box in map_image_boxes.items():
+                    org_img = image_box["image"]
+                    for bb in image_box["bbox"]:  # img is shape (1,)
+                        x, y, w, h = bb
+                        roi = org_img[y:y+h, x:x+w]
+                        roi = cv2.resize(np.array(roi), (int(w*64/h) ,64), interpolation = cv2.INTER_AREA)
+                        roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) / 255.0
+                        roi = normalizePAD.normalize(roi)
+                        roi = np.array(roi).astype("float32")
+                        batch_out['textline'].append(roi)
+            else:
+                raise pb_utils.TritonModelException("There is no text inside image")
 
-            
             # Format outputs to build an InferenceResponse
-            #  batch_out['textline'] shape: 150 boxes of images + 100 boxes of image 2 = 250 boxes
-            #  batch_out['nbox'] = [1 1 1 1 1 2 2]
             output_tensors = [Tensor(self.output_names[k], np.asarray(
                 out, dtype=self.output_dtypes[k])) for k, out in batch_out.items()]
 
@@ -151,4 +158,4 @@ class TritonPythonModel(object):
             response = InferenceResponse(output_tensors)
             responses.append(response)
 
-        return responses        
+        return responses
