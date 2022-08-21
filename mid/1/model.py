@@ -104,7 +104,7 @@ class TritonPythonModel(object):
 
             img_idx = 0
             map_image_boxes = {}
-            for image, mask, scale_img in zip(batch_in['image'], batch_in['mask'], batch_in['scale']):  # img is shape (1,)
+            for image, mask, scale_img in zip(batch_in['image'], batch_in['mask'], batch_in['scale']): # img is shape (1,)
                 img_idx += 1
                 image_h, image_w = image.shape[:2]
                 org_img = cv2.resize(np.array(image), (int(image_w*scale_img[0]) ,int(image_h*scale_img[1])), interpolation = cv2.INTER_AREA)
@@ -116,6 +116,7 @@ class TritonPythonModel(object):
                 img = cv2.dilate(np.array(img).astype("uint8"), kernel, iterations=1)
                 contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 map_image_boxes[img_idx] = {"image": org_img, "bbox": []}
+                n_boxes = 0
                 for contour in contours:
                     x,y,w,h = cv2.boundingRect(contour)
                     x = int(x*scale_net[0]*scale_img[0])
@@ -129,9 +130,14 @@ class TritonPythonModel(object):
                     y2 = y + h
                     if x2 > image_w: x2 = image_w
                     if y2 > image_h: y2 = image_h
+                    n_boxes += 1
                     map_image_boxes[img_idx]["bbox"].append([x, y, x2-x, y2-y])
                     batch_out['bbox'].append([x, y, x2 - x, y2 - y])
                     batch_out['mbbox'].append(img_idx)
+                if n_boxes == 0: # add dummy boxes for image which have no textline
+                    batch_out['mbbox'].append(img_idx)
+                    batch_out['bbox'].append([-1, -1, -1, -1])
+
             if len(batch_out['bbox']) > 0:
                 max_w = max([math.ceil(bb[2]/bb[3])*64 for bb in batch_out['bbox']])
                 normalizePAD = NormalizePAD((1, 64, max_w))
@@ -145,8 +151,8 @@ class TritonPythonModel(object):
                         roi = normalizePAD.normalize(roi)
                         roi = np.array(roi).astype("float32")
                         batch_out['textline'].append(roi)
-            else:
-                raise pb_utils.TritonModelException("There is no text inside image")
+                    if len(image_box["bbox"]) == 0: # add dummy textline for image which have no textline
+                        batch_out['textline'].append(np.zeros((1, 64, max_w)).astype("float32"))
 
             # Format outputs to build an InferenceResponse
             output_tensors = [Tensor(self.output_names[k], np.asarray(

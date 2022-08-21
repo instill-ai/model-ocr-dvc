@@ -160,33 +160,36 @@ class TritonPythonModel(object):
             mbox = batch_in['mbox']
             ocr = batch_in['ocr']
 
-            preds_size = torch.IntTensor([ocr.shape[1]] * ocr.shape[0])
-            preds_prob = F.softmax(torch.from_numpy(np.array(ocr)).float().to(device), dim=2)
-            preds_prob = preds_prob.cpu().detach().numpy()
-            pred_norm = preds_prob.sum(axis=2)
-            preds_prob = preds_prob/np.expand_dims(pred_norm, axis=-1)
-            preds_prob = torch.from_numpy(preds_prob).float().to(device)
-            _, preds_index = preds_prob.max(2)
-            preds_index = preds_index.view(-1)
-            preds_str = self.converter.decode_greedy(preds_index.data.cpu().detach().numpy(), preds_size.data)
+            # dummy zero box return in case of no text bounding box
+            if len(ocr) > 0:
+                preds_size = torch.IntTensor([ocr.shape[1]] * ocr.shape[0])
+                preds_prob = F.softmax(torch.from_numpy(np.array(ocr)).float().to(device), dim=2)
+                preds_prob = preds_prob.cpu().detach().numpy()
+                pred_norm = preds_prob.sum(axis=2)
+                preds_prob = preds_prob/np.expand_dims(pred_norm, axis=-1)
+                preds_prob = torch.from_numpy(preds_prob).float().to(device)
+                _, preds_index = preds_prob.max(2)
+                preds_index = preds_index.view(-1)
+                preds_str = self.converter.decode_greedy(preds_index.data.cpu().detach().numpy(), preds_size.data)
 
-            img_idx_prev = 0
-            for i, img_idx in enumerate(mbox): # image idex start from 1
-                if img_idx != img_idx_prev:
-                    batch_out['box'].append([box[i]])
-                    batch_out['text'].append([preds_str[i]])
-                    img_idx_prev = img_idx
-                    continue
-                batch_out['box'][-1].append(box[i])
-                batch_out['text'][-1].append(preds_str[i])
+                img_idx_prev = 0
+                for i, img_idx in enumerate(mbox): # image idex start from 1
+                    if img_idx != img_idx_prev:
+                        batch_out['box'].append([box[i]])
+                        batch_out['text'].append([preds_str[i]])
+                        img_idx_prev = img_idx
+                        continue
+                    batch_out['box'][-1].append(box[i])
+                    batch_out['text'][-1].append(preds_str[i])
 
-            max_obj = max([len(b)  for b in batch_out['box']])
-            # The output of all imgs must have the same size for Triton to be able to output a Tensor of type self.output_dtypes
-            # Non-meaningful bounding boxes have coords [-1, -1, -1, -1] and text '' will be added and remove in model-backend
-            for i, b in enumerate(batch_out['box']):
-                for _ in range(max_obj - len(b)):
-                    batch_out['box'][i].append([-1, -1, -1, -1])
-                    batch_out['text'][i].append("")
+                max_obj = max([len(b)  for b in batch_out['box']])
+                # The output of all imgs must have the same size for Triton to be able to output a Tensor of type self.output_dtypes
+                # Non-meaningful bounding boxes have coords [-1, -1, -1, -1] and text '' will be added and remove in model-backend
+                for i, b in enumerate(batch_out['box']):
+                    for _ in range(max_obj - len(b)):
+                        batch_out['box'][i].append([-1, -1, -1, -1])
+                        batch_out['text'][i].append("")
+
             # Format outputs to build an InferenceResponse
             output_tensors = [Tensor(self.output_names[k], np.asarray(
                 out, dtype=self.output_dtypes[k])) for k, out in batch_out.items()]
@@ -197,4 +200,4 @@ class TritonPythonModel(object):
             response = InferenceResponse(output_tensors)
             responses.append(response)
 
-        return responses        
+        return responses
