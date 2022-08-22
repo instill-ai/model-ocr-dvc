@@ -2,8 +2,11 @@
 Task: OCR
 Tags:
   - OCR
-  - Document understanding
+  - Text extraction
+  - Text recognition
 ---
 
 # Ocr repo
-This is OCR model used for text recognition based on [MMOCR](https://github.com/open-mmlab/mmocr) and [EasyOCR](https://github.com/JaidedAI/EasyOCR)
+The OCR model combines two models: 
+- [PSNet](https://github.com/open-mmlab/mmocr/blob/main/configs/textdet/psenet/README.md): a text detection model that locates bounding boxes that contain texts and 
+- [EasyOCR](https://github.com/JaidedAI/EasyOCR): a text recognition model that recognises texts in the detected bounding boxes.
