@@ -11,6 +11,11 @@ from triton_python_backend_utils import Tensor, InferenceResponse, \
     get_input_tensor_by_name, InferenceRequest, get_input_config_by_name, \
     get_output_config_by_name, triton_string_to_numpy
 
+
+def custom_mean(x):
+    return x.prod()**(2.0/np.sqrt(len(x)))
+
+    
 class CTCLabelConverter(object):
     """ Convert between text-label and text-index """
 
