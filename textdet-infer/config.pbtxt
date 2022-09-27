@@ -1,6 +1,6 @@
 name: "textdet-infer"
 platform: "onnxruntime_onnx"
-max_batch_size: 10
+max_batch_size: 1
 instance_group [
   {
     count: 1

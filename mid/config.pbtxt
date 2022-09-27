@@ -1,6 +1,6 @@
 name: "mid"
 backend: "python"
-max_batch_size: 10
+max_batch_size: 1
 input [
   {
     name: "mask"
