@@ -33,7 +33,12 @@ output [
     name: "text"
     data_type: TYPE_STRING
     dims: [ -1 ]
-  }  
+  },
+  {
+    name: "score"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }    
 ]
 instance_group [
   {
