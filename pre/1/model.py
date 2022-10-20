@@ -73,9 +73,12 @@ class TritonPythonModel(object):
                 pil_img = Image.open(io.BytesIO(img[0]))
                 h, w = np.array(pil_img).shape[:2]
                 pil_img = pil_img.resize(newsize)
-                batch_out['image'].append(np.array(pil_img))
+                image = np.array(pil_img)
+                if len(image.shape) == 2:  # gray image
+                    image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+                batch_out['image'].append(image)
                 batch_out['scale'].append([w/2240, h/1920])
-                image = cv2.cvtColor(np.array(pil_img), cv2.COLOR_BGR2RGB)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 image = (image - (123.675, 116.28, 103.53))/(58.395, 57.12, 57.375)
                 image = np.transpose(image, (2, 0, 1))
                 # image = np.expand_dims(image, axis=0)
