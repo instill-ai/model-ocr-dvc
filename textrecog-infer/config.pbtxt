@@ -1,6 +1,6 @@
 name: "textrecog-infer"
 platform: "onnxruntime_onnx"
-max_batch_size: 1
+max_batch_size: 1024
 instance_group [
   {
     count: 1
