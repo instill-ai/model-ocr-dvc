@@ -6,14 +6,10 @@ import cv2
 import torch
 import torchvision.transforms as transforms
 
-from random import choice
 from typing import List
 
-from triton_python_backend_utils import Tensor, InferenceResponse, \
-    get_input_tensor_by_name, InferenceRequest, get_input_config_by_name, \
-    get_output_config_by_name, triton_string_to_numpy
-
-import triton_python_backend_utils as pb_utils
+from triton_python_backend_utils import get_output_config_by_name, triton_string_to_numpy, get_input_config_by_name
+from c_python_backend_utils import Tensor, InferenceResponse, InferenceRequest
 
 
 class NormalizePAD(object):
